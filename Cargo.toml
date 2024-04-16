@@ -1,0 +1,20 @@
+[package]
+name = "serdapt-base64"
+version = "0.1.0"
+authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
+edition = "2021"
+description = "Adapter to serialize as base64"
+license = "0BSD"
+homepage = "https://github.com/stephaneyfx/serdapt-base64"
+repository = "https://github.com/stephaneyfx/serdapt-base64.git"
+documentation = "https://docs.rs/serdapt-base64"
+keywords = ["adapter", "base64", "serde", "with"]
+
+[dependencies]
+base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
+serdapt = "0.1.0"
+serde = { version = "1.0.209", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+serde = { version = "1.0.209", features = ["derive"] }
+serde_json = "1.0.127"
