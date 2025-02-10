@@ -234,10 +234,12 @@ impl<'de, const N: usize> Visitor<'de> for Base64ArrayVisitor<N> {
         E: serde::de::Error,
     {
         let mut out = [0u8; N];
-        let n = self
-            .engine
-            .decode_slice(v, &mut out)
-            .map_err(serde::de::Error::custom)?;
+        let n = self.engine.decode_slice(v, &mut out).map_err(|e| match e {
+            base64::DecodeSliceError::DecodeError(_) => serde::de::Error::custom(e),
+            base64::DecodeSliceError::OutputSliceTooSmall => {
+                serde::de::Error::invalid_length(N + 1, &self)
+            }
+        })?;
         Some(out)
             .filter(|_| n == N)
             .ok_or_else(|| serde::de::Error::invalid_length(n, &self))
