@@ -1,6 +1,6 @@
 [package]
 name = "serdapt-base64"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
 edition = "2021"
 description = "Adapter to serialize as base64"
