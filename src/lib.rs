@@ -118,7 +118,7 @@ impl Base64Visitor {
     }
 }
 
-impl<'de> Visitor<'de> for Base64Visitor {
+impl Visitor<'_> for Base64Visitor {
     type Value = Vec<u8>;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -224,7 +224,7 @@ impl<const N: usize> Base64ArrayVisitor<N> {
     }
 }
 
-impl<'de, const N: usize> Visitor<'de> for Base64ArrayVisitor<N> {
+impl<const N: usize> Visitor<'_> for Base64ArrayVisitor<N> {
     type Value = [u8; N];
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
