@@ -38,11 +38,14 @@ use serde::{de::Visitor, Deserializer, Serialize, Serializer};
 /// use serde::{Deserialize, Serialize};
 /// use serde_json::json;
 ///
-/// #[derive(Deserialize, Serialize)]
+/// #[derive(Debug, Deserialize, PartialEq, Serialize)]
 /// struct Foo(#[serde(with = "serdapt_base64::StdBase64")] Vec<u8>);
 ///
-/// let v = serde_json::to_value(Foo(vec![9, 1, 67])).unwrap();
+/// let x = Foo(vec![9, 1, 67]);
+/// let v = serde_json::to_value(&x).unwrap();
 /// assert_eq!(v, json!("CQFD"));
+/// let x2 = serde_json::from_value::<Foo>(v).unwrap();
+/// assert_eq!(x, x2);
 /// ```
 pub struct Base64<Alphabet = Standard, const WRITE_PADDING: bool = false, ReadPadding = NoPadding> {
     alphabet: PhantomData<Alphabet>,
@@ -142,11 +145,14 @@ impl Visitor<'_> for Base64Visitor {
 /// use serde::{Deserialize, Serialize};
 /// use serde_json::json;
 ///
-/// #[derive(Deserialize, Serialize)]
+/// #[derive(Debug, Deserialize, PartialEq, Serialize)]
 /// struct Foo(#[serde(with = "serdapt_base64::StdBase64Array")] [u8; 3]);
 ///
-/// let v = serde_json::to_value(Foo([9, 1, 67])).unwrap();
+/// let x = Foo([9, 1, 67]);
+/// let v = serde_json::to_value(&x).unwrap();
 /// assert_eq!(v, json!("CQFD"));
+/// let x2 = serde_json::from_value::<Foo>(v).unwrap();
+/// assert_eq!(x, x2);
 /// ```
 pub struct Base64Array<
     Alphabet = Standard,
