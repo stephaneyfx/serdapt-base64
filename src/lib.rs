@@ -47,17 +47,14 @@ use serde::{de::Visitor, Deserializer, Serialize, Serializer};
 /// let x2 = serde_json::from_value::<Foo>(v).unwrap();
 /// assert_eq!(x, x2);
 /// ```
-pub struct Base64<Alphabet = Standard, const WRITE_PADDING: bool = false, ReadPadding = NoPadding> {
-    alphabet: PhantomData<Alphabet>,
-    read_padding: PhantomData<ReadPadding>,
+pub struct Base64<A = Standard> {
+    alphabet: PhantomData<A>,
 }
 
 /// Adapter to serialize bytes as a base64 string using the standard alphabet
 pub type StdBase64 = Base64;
 
-impl<Alphabet, const WRITE_PADDING: bool, ReadPadding>
-    Base64<Alphabet, WRITE_PADDING, ReadPadding>
-{
+impl<A> Base64<A> {
     /// Serializes value with adapter
     pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -78,21 +75,19 @@ impl<Alphabet, const WRITE_PADDING: bool, ReadPadding>
     }
 }
 
-impl<A, const W: bool, R, T> SerializeWith<T> for Base64<A, W, R>
+impl<A, T> SerializeWith<T> for Base64<A>
 where
-    A: Alphabet,
-    R: ReadPadding,
+    A: AlphabetTag,
     T: AsRef<[u8]>,
 {
     fn serialize_with<S: Serializer>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error> {
-        Serialize::serialize(&engine::<A, R>(W).encode(bytes), serializer)
+        Serialize::serialize(&A::VALUE.inner.encode(bytes), serializer)
     }
 }
 
-impl<'de, A, const W: bool, R, T> DeserializeWith<'de, T> for Base64<A, W, R>
+impl<'de, A, T> DeserializeWith<'de, T> for Base64<A>
 where
-    A: Alphabet,
-    R: ReadPadding,
+    A: AlphabetTag,
     T: TryFrom<Vec<u8>>,
     T::Error: Display,
 {
@@ -100,23 +95,22 @@ where
     where
         D: Deserializer<'de>,
     {
-        let bytes = deserializer.deserialize_str(Base64Visitor::new::<A, R>(W))?;
+        let bytes = deserializer.deserialize_str(Base64Visitor::new::<A>())?;
         bytes.try_into().map_err(serde::de::Error::custom)
     }
 }
 
 struct Base64Visitor {
-    engine: base64::engine::GeneralPurpose,
+    engine: &'static base64::engine::GeneralPurpose,
 }
 
 impl Base64Visitor {
-    const fn new<A, R>(write_padding: bool) -> Self
+    const fn new<A>() -> Self
     where
-        A: Alphabet,
-        R: ReadPadding,
+        A: AlphabetTag,
     {
         Self {
-            engine: engine::<A, R>(write_padding),
+            engine: &A::VALUE.inner,
         }
     }
 }
@@ -154,21 +148,14 @@ impl Visitor<'_> for Base64Visitor {
 /// let x2 = serde_json::from_value::<Foo>(v).unwrap();
 /// assert_eq!(x, x2);
 /// ```
-pub struct Base64Array<
-    Alphabet = Standard,
-    const WRITE_PADDING: bool = false,
-    ReadPadding = NoPadding,
-> {
-    alphabet: PhantomData<Alphabet>,
-    read_padding: PhantomData<ReadPadding>,
+pub struct Base64Array<A = Standard> {
+    alphabet: PhantomData<A>,
 }
 
 /// Adapter to serialize a byte array as a base64 string using the standard alphabet
 pub type StdBase64Array = Base64Array;
 
-impl<Alphabet, const WRITE_PADDING: bool, ReadPadding>
-    Base64Array<Alphabet, WRITE_PADDING, ReadPadding>
-{
+impl<A> Base64Array<A> {
     /// Serializes value with adapter
     pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -189,43 +176,39 @@ impl<Alphabet, const WRITE_PADDING: bool, ReadPadding>
     }
 }
 
-impl<A, const W: bool, R, T> SerializeWith<T> for Base64Array<A, W, R>
+impl<A, T> SerializeWith<T> for Base64Array<A>
 where
-    A: Alphabet,
-    R: ReadPadding,
+    A: AlphabetTag,
     T: AsRef<[u8]>,
 {
     fn serialize_with<S: Serializer>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error> {
-        Serialize::serialize(&engine::<A, R>(W).encode(bytes), serializer)
+        Serialize::serialize(&A::VALUE.inner.encode(bytes), serializer)
     }
 }
 
-impl<'de, A, const W: bool, R, const N: usize> DeserializeWith<'de, [u8; N]>
-    for Base64Array<A, W, R>
+impl<'de, A, const N: usize> DeserializeWith<'de, [u8; N]> for Base64Array<A>
 where
-    A: Alphabet,
-    R: ReadPadding,
+    A: AlphabetTag,
 {
     fn deserialize_with<D>(deserializer: D) -> Result<[u8; N], D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(Base64ArrayVisitor::<N>::new::<A, R>(W))
+        deserializer.deserialize_str(Base64ArrayVisitor::<N>::new::<A>())
     }
 }
 
 struct Base64ArrayVisitor<const N: usize> {
-    engine: base64::engine::GeneralPurpose,
+    engine: &'static base64::engine::GeneralPurpose,
 }
 
 impl<const N: usize> Base64ArrayVisitor<N> {
-    const fn new<A, R>(write_padding: bool) -> Self
+    const fn new<A>() -> Self
     where
-        A: Alphabet,
-        R: ReadPadding,
+        A: AlphabetTag,
     {
         Self {
-            engine: engine::<A, R>(write_padding),
+            engine: &A::VALUE.inner,
         }
     }
 }
@@ -254,32 +237,51 @@ impl<const N: usize> Visitor<'_> for Base64ArrayVisitor<N> {
     }
 }
 
-/// Defines a base64 alphabet
-pub trait Alphabet {
-    /// Characters making up the alphabet
-    const CHARS: [u8; 64];
+/// Types representing a base64 alphabet
+pub trait AlphabetTag {
+    /// Alphabet instance
+    const VALUE: Alphabet;
 }
 
-/// Adapter argument to use the standard base64 alphabet
+/// Alphabet definition
+#[derive(Debug)]
+pub struct Alphabet {
+    inner: base64::engine::GeneralPurpose,
+}
+
+impl Alphabet {
+    /// Constructs a base64 alphabet using the provided characters
+    ///
+    /// Panics if the character set is invalid (e.g. if it contains '=').
+    pub const fn new(chars: &[u8; 64], padding: PaddingStrategy) -> Alphabet {
+        Self {
+            inner: engine(chars, padding),
+        }
+    }
+}
+
+/// Adapter argument to use the standard base64 alphabet with required padding
+#[derive(Debug)]
 pub struct Standard;
 
-impl Alphabet for Standard {
-    const CHARS: [u8; 64] = *b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+impl AlphabetTag for Standard {
+    const VALUE: Alphabet = Alphabet {
+        inner: base64::engine::general_purpose::STANDARD,
+    };
 }
 
-/// Adapter argument to use the URL-safe base64 alphabet
+/// Adapter argument to use the URL-safe base64 alphabet with required padding
+#[derive(Debug)]
 pub struct UrlSafe;
 
-impl Alphabet for UrlSafe {
-    const CHARS: [u8; 64] = *b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+impl AlphabetTag for UrlSafe {
+    const VALUE: Alphabet = Alphabet {
+        inner: base64::engine::general_purpose::URL_SAFE,
+    };
 }
 
-const fn engine<A, R>(write_padding: bool) -> base64::engine::GeneralPurpose
-where
-    A: Alphabet,
-    R: ReadPadding,
-{
-    let s = match core::str::from_utf8(&A::CHARS) {
+const fn engine(chars: &[u8; 64], padding: PaddingStrategy) -> base64::engine::GeneralPurpose {
+    let s = match core::str::from_utf8(chars) {
         Ok(s) => s,
         Err(_) => panic!("Invalid base64 alphabet"),
     };
@@ -290,55 +292,36 @@ where
     base64::engine::GeneralPurpose::new(
         &alphabet,
         base64::engine::GeneralPurposeConfig::new()
-            .with_encode_padding(write_padding)
-            .with_decode_padding_mode(R::STRATEGY.padding_mode()),
+            .with_encode_padding(padding.write())
+            .with_decode_padding_mode(padding.padding_mode()),
     )
 }
 
-/// Defines how to handle padding when decoding
-pub trait ReadPadding {
-    /// Strategy to handle padding when decoding
-    const STRATEGY: ReadPaddingStrategy;
-}
-
-/// Adapter argument to ignore padding when decoding
-pub struct Ignore;
-
-impl ReadPadding for Ignore {
-    const STRATEGY: ReadPaddingStrategy = ReadPaddingStrategy::Ignore;
-}
-
-/// Adapter argument to require canonical padding when decoding
-pub struct Canonical;
-
-impl ReadPadding for Canonical {
-    const STRATEGY: ReadPaddingStrategy = ReadPaddingStrategy::Canonical;
-}
-
-/// Adapter argument to require no padding when decoding
-pub struct NoPadding;
-
-impl ReadPadding for NoPadding {
-    const STRATEGY: ReadPaddingStrategy = ReadPaddingStrategy::NoPadding;
-}
-
-/// Ways to handle padding when decoding
+/// Ways to handle padding
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ReadPaddingStrategy {
-    /// Require no padding
-    NoPadding,
-    /// Require canonical padding
-    Canonical,
-    /// Ignore padding
-    Ignore,
+#[non_exhaustive]
+pub enum PaddingStrategy {
+    /// Padding is not written and is ignored if read
+    Ignored,
+    /// Padding is required
+    Required,
+    /// Padding is disallowed
+    None,
 }
 
-impl ReadPaddingStrategy {
+impl PaddingStrategy {
     const fn padding_mode(self) -> base64::engine::DecodePaddingMode {
         match self {
-            Self::NoPadding => base64::engine::DecodePaddingMode::RequireNone,
-            Self::Canonical => base64::engine::DecodePaddingMode::RequireCanonical,
-            Self::Ignore => base64::engine::DecodePaddingMode::Indifferent,
+            Self::Ignored => base64::engine::DecodePaddingMode::Indifferent,
+            Self::Required => base64::engine::DecodePaddingMode::RequireCanonical,
+            Self::None => base64::engine::DecodePaddingMode::RequireNone,
+        }
+    }
+
+    const fn write(self) -> bool {
+        match self {
+            Self::Required => true,
+            Self::Ignored | Self::None => false,
         }
     }
 }
